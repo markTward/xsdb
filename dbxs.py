@@ -4,12 +4,14 @@ Created on Aug 26, 2013
 @author: mward
 '''
 
+import sys
+
 db = {}
 idx = {}
 bi = {}
 
 TRANLEVEL=0
-DEBUG=0
+DEBUG=1
     
 def begin():
     global TRANLEVEL
@@ -25,13 +27,13 @@ def rollback():
         for trans in bi[TRANLEVEL]:
             if DEBUG > 0: print '  BACKOUT transaction', trans
             if trans[1] != None:
-                dbset(trans[0],trans[1],rollback=True)
+                dbset(trans[0],trans[1], is_rollback=True)
             else:
-                dbunset(trans[0], rollback=True)
+                dbunset(trans[0], is_rollback=True)
         bi.pop(TRANLEVEL)
         TRANLEVEL -= 1
     else:
-        return 'NO TRANSACTION'
+        print 'NO TRANSACTION'
 
 def commit():
     global bi, TRANLEVEL
@@ -59,9 +61,9 @@ def idx_remove(k,v):
     if len(idx[k]) == 0:
         idx.pop(k)
       
-def dbset(k,v,rollback=False):
+def dbset(k,v,is_rollback=False):
     # if transaction
-    if not rollback:
+    if not is_rollback:
         biwrite(k,v)
         
     # if update and not create, remove previous index
@@ -95,22 +97,49 @@ def dbunset(k,is_rollback=False):
         # remove from database    
         db.pop(k)
 
-def numeqto(v):
-    return len(idx[v]) if v in idx else 0
+def numeqto(k):
+    return len(idx[k]) if k in idx else 0
 
 def show_dbbd():
-    print 'db{}==>', db
-    print 'idx{}==>', idx
-    return True
+#     print 'db{}==>', db
+#     print 'idx{}==>', idx
+    print db, idx
+   
+def cmd_exec(cmd):
+
+    try:
+        icmd = cmd[0]        
+    except:
+        print "cmd_exec() ERROR in retrieving command"
+        
+    params = {}
     
+    if len(cmd) == 3:
+        params = {'k':cmd[1],'v':cmd[2]}
+    elif len(cmd) == 2:
+        params = {'k':cmd[1]}
+    
+    if DEBUG > 1: print 'input cmd_input::split==>', cmd, icmd, params
+    
+    cmdlist = {'set':dbset, 'unset':dbunset, 'get':dbget, 'numeqto':numeqto, 
+               'begin':begin,'rollback':rollback,'commit':commit, 
+               'show':show_dbbd, 'end':exit}
+    
+    try:
+        result = cmdlist[icmd](**params)
+        if result != None: print result
+    except:
+        print 'cmd_exec failed for:', icmd, params
+    
+cmd_input = ''
 if __name__ == '__main__':   
-    while input != 'END': 
-        input = raw_input("===>")
-        print 'input = ',input
+    while cmd_input.lower() != 'end': 
+        try:
+            cmd_input = sys.stdin.readline().strip()
+        except KeyboardInterrupt:
+            break
         
-
-
-
-
-
-        
+        if not cmd_input:
+            break
+          
+        cmd_exec(cmd_input.lower().split())    
