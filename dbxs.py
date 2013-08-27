@@ -1,3 +1,4 @@
+#!/usr/local/bin/python
 '''
 dbxs.py
 Created on Aug 26, 2013
@@ -51,8 +52,6 @@ def commit():
         return 'NO TRANSACTION'
     
 def biwrite(k,v,is_rollback=False):
-    global TRANLEVEL
-    
     # only write to bi-image at least one 'begin' has been invoked not a 'rollback'
     if TRANLEVEL < 1 or is_rollback: return
 
@@ -136,9 +135,10 @@ def cmd_exec(cmd):
     elif len(cmd) == 2:
         params = {'k':cmd[1]}
     
-    # execute function defined in cmdlist with parameter blob
+    # execute function defined in cmdlist with parameter keyword blob
     try:
         result = cmdlist[icmd](**params)
+        # TODO: figure out best practice for handling function return when no return defined
         if icmd in printresult and result != None: print result
     except:
         print 'cmd_exec failed for:', icmd, params
