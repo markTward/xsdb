@@ -11,7 +11,7 @@ idx = {}
 bi = {}
 
 TRANLEVEL=0
-DEBUG=1
+DEBUG=0
     
 def begin():
     global TRANLEVEL
@@ -33,14 +33,17 @@ def rollback():
         bi.pop(TRANLEVEL)
         TRANLEVEL -= 1
     else:
-        print 'NO TRANSACTION'
+        return 'NO TRANSACTION'
 
 def commit():
     global bi, TRANLEVEL
-    if DEBUG > 0: print 'BEFORE COMMIT bi=>', bi
-    bi = {}
-    TRANLEVEL = 0
-    if DEBUG > 0: print 'AFTER COMMIT bi=>', bi
+    if DEBUG > 0: print 'BEFORE COMMIT: bi=>', bi
+    if TRANLEVEL > 0:
+        bi = {}
+        TRANLEVEL = 0
+    else:
+        return 'NO TRANSACTION'
+    if DEBUG > 0: print 'AFTER COMMIT: bi=>', bi
     
 def biwrite(k,v):
     global TRANLEVEL
@@ -66,19 +69,25 @@ def dbset(k,v,is_rollback=False):
     if not is_rollback:
         biwrite(k,v)
         
-    # if update and not create, remove previous index
+    # if update and not create, remove previous index entry corresponding to previous value
     if k in db:
         idx_remove(db[k],k)
 
-    # write to database
+    # create / update
     db[k] = v
     
-    # create new or update existing index
-    if v in idx:
-        idx[v] = idx[v].union((k,))
-    else:
+    # create new or update existing index based on current value
+#     if v in idx:
+#         idx[v] = idx[v].union((k,))
+#     else:
+#         idx[v] = set()
+#         idx[v].update((k,))
+        
+    if v not in idx:
         idx[v] = set()
-        idx[v].update((k,))
+        
+    idx[v] = idx[v].union((k,))
+    
     
     
 def dbget(k):
@@ -97,13 +106,11 @@ def dbunset(k,is_rollback=False):
         # remove from database    
         db.pop(k)
 
-def numeqto(k):
+def numequalto(k):
     return len(idx[k]) if k in idx else 0
 
-def show_dbbd():
-#     print 'db{}==>', db
-#     print 'idx{}==>', idx
-    print db, idx
+def show():
+    return 'db{}==>',db, 'idx{}==>', idx, 'bi{}==>',bi
    
 def cmd_exec(cmd):
 
@@ -119,27 +126,29 @@ def cmd_exec(cmd):
     elif len(cmd) == 2:
         params = {'k':cmd[1]}
     
-    if DEBUG > 1: print 'input cmd_input::split==>', cmd, icmd, params
+    if DEBUG > 0: print 'input cmd_input::split==>', cmd, icmd, params
     
-    cmdlist = {'set':dbset, 'unset':dbunset, 'get':dbget, 'numeqto':numeqto, 
+    cmdlist = {'set':dbset, 'unset':dbunset, 'get':dbget, 'numequalto':numequalto, 
                'begin':begin,'rollback':rollback,'commit':commit, 
-               'show':show_dbbd, 'end':exit}
+               'show':show}
+    
+    printresult = ['get','numequalto','show', 'commit', 'rollback']
     
     try:
         result = cmdlist[icmd](**params)
-        if result != None: print result
+        if icmd in printresult and result != None: print result
     except:
         print 'cmd_exec failed for:', icmd, params
-    
-cmd_input = ''
-if __name__ == '__main__':   
-    while cmd_input.lower() != 'end': 
+     
+
+if __name__ == '__main__':
+    while True: 
         try:
             cmd_input = sys.stdin.readline().strip()
         except KeyboardInterrupt:
             break
         
-        if not cmd_input:
+        if not cmd_input or cmd_input.lower() == 'end':
             break
           
         cmd_exec(cmd_input.lower().split())    
