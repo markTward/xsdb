@@ -1,7 +1,10 @@
 '''
+dbxs.py
 Created on Aug 26, 2013
-
 @author: mward
+
+challenge to create an xtra small DB with set,get,unset and transaction scoping (global commit)
+
 '''
 
 import sys
@@ -39,20 +42,21 @@ def rollback():
         return 'NO TRANSACTION'
 
 def commit():
-    global bi, TRANLEVEL
+    global TRANLEVEL
+    
     if TRANLEVEL > 0:
-        bi = {}
+        bi.clear()
         TRANLEVEL = 0
     else:
         return 'NO TRANSACTION'
-    if DEBUG > 0: print 'AFTER COMMIT: bi=>', bi
     
-def biwrite(k,v):
+def biwrite(k,v,is_rollback=False):
     global TRANLEVEL
-    global bi
     
-    if TRANLEVEL < 1: return
+    # only write to bi-image at least one 'begin' has been invoked not a 'rollback'
+    if TRANLEVEL < 1 or is_rollback: return
 
+    # TODO:
     if k in db:
         bi[TRANLEVEL].insert(0, (k,db[k]))
     else:
@@ -67,9 +71,9 @@ def idx_remove(k,v):
         idx.pop(k)
       
 def dbset(k,v,is_rollback=False):
-    # if transaction
-    if not is_rollback:
-        biwrite(k,v)
+    # send tranactionto biwriter
+    # TODO: make biwrite into a decorator
+    biwrite(k,v,is_rollback)
         
     # if update and not create, remove previous index entry corresponding to previous value
     if k in db:
@@ -78,34 +82,25 @@ def dbset(k,v,is_rollback=False):
     # create / update
     db[k] = v
     
-    # create new or update existing index based on current value
-#     if v in idx:
-#         idx[v] = idx[v].union((k,))
-#     else:
-#         idx[v] = set()
-#         idx[v].update((k,))
-        
+    # create new or update existing index based on current value        
     if v not in idx:
         idx[v] = set()
         
     idx[v] = idx[v].union((k,))
     
-    
-    
+   
 def dbget(k):
     return db[k] if k in db else 'NULL'
 
 def dbunset(k,is_rollback=False):
     if k in db:
-        # if not rollback, write to bi
-        if not is_rollback:
-            biwrite(k,db[k])
-        # clear from index
-        #vtemp = db[k]
+        # send to bi writer; TODO: make into decorator?
+        biwrite(k,db[k],is_rollback)
         
+        # remove index for value of k
         idx_remove(db[k],k)
             
-        # remove from database    
+        # remove entry from database    
         db.pop(k)
 
 def numequalto(k):
