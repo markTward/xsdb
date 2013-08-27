@@ -26,10 +26,13 @@ def rollback():
         if DEBUG > 0: print 'REMOVE ROLLBACK TRANLEVEL==>', TRANLEVEL, bi[TRANLEVEL]
         for trans in bi[TRANLEVEL]:
             if DEBUG > 0: print '  BACKOUT transaction', trans
+            # rollback by executing previous state's set and unset commands
+            # is_rollback=True blocks rewrite to bi file
             if trans[1] != None:
                 dbset(trans[0],trans[1], is_rollback=True)
             else:
                 dbunset(trans[0], is_rollback=True)
+        # remove just restore bi level and decrement to previous transaction rollback level        
         bi.pop(TRANLEVEL)
         TRANLEVEL -= 1
     else:
@@ -37,7 +40,6 @@ def rollback():
 
 def commit():
     global bi, TRANLEVEL
-    if DEBUG > 0: print 'BEFORE COMMIT: bi=>', bi
     if TRANLEVEL > 0:
         bi = {}
         TRANLEVEL = 0
