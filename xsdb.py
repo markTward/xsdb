@@ -1,7 +1,8 @@
 '''
-dbxs.py
-Created on Aug 26, 2013
-@author: mward
+xsdb.py
+Created on Aug 28, 2013
+@author: Mark Ward
+@license: free free free!
 
 challenge to create an xtra small in-memory DB
 database (db) write is 'optimistic' and always current
