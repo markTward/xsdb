@@ -3,54 +3,60 @@ dbxs.py
 Created on Aug 26, 2013
 @author: mward
 
-challenge to create an xtra small DB with set,get,unset and transaction scoping (global commit)
+challenge to create an xtra small in-memory DB
 
 '''
 
 from __future__ import print_function
 import sys, shlex
+import shelve
 
-
+# global values to support database key/value pair storage, indexing and before-imaging if a transaction is invoked
 db = {}
 idx = {}
 bi = {}
-
 TRANLEVEL=0
+
+# global value for viewing/hiding debuggin statements
 DEBUG=False
 
+# toggle DEBUG setting
 def debug():
     global DEBUG
     DEBUG = not DEBUG
 
+# simple dump of debugging text
 def debugprint(*args):
     if DEBUG:
         print (args)
     
+# initialize a new transaction level
 def begin():
     global TRANLEVEL
     TRANLEVEL += 1
     if TRANLEVEL not in bi:
         bi[TRANLEVEL] = {}
     debugprint('BEGIN TRANLEVEL==>', TRANLEVEL, bi)
-    
+
+# rollback key/value pairs to previous transaction level
 def rollback():
     global TRANLEVEL    
     if TRANLEVEL >= 1:
         debugprint('ROLLBACK TRANLEVEL==>', TRANLEVEL, bi[TRANLEVEL])
         for db_key ,rollback_value in bi[TRANLEVEL].items():
             debugprint('  BACKOUT transaction to', db_key ,rollback_value)
-            # rollback by executing previous state's set and unset commands
-            # is_rollback=True blocks rewrite to bi file blocked
+            # rollback by executing previous state's set and unset commands while blocking before-image writing
             if rollback_value != None:
                 dbset(db_key, rollback_value, is_rollback=True)
             else:
                 dbunset(db_key, is_rollback=True)
-        # remove just restore bi level and decrement to previous transaction rollback level        
+        # remove just restored bi level and decrement transaction level        
         bi.pop(TRANLEVEL)
         TRANLEVEL -= 1
     else:
         return 'NO TRANSACTION'
 
+# commit all transaction across all levels by clearing before-image
 def commit():
     global TRANLEVEL
     if TRANLEVEL > 0:
@@ -59,11 +65,12 @@ def commit():
     else:
         return 'NO TRANSACTION'
     
+# store current key/value pair state in before-image
 def biwrite(k,v,is_rollback=False):
-    # only write to bi-image at least one 'begin' has been invoked not a 'rollback'
+    # do not write to before-image if not a transaction or called during rollback
     if TRANLEVEL < 1 or is_rollback: return
 
-    # maintain state for k,v pair or k,None if it is new
+    # maintain state for (k,v) pair or if it's new, (k,None)
     if not k in bi[TRANLEVEL]:
         if k in db:
             bi[TRANLEVEL][k]=db[k]
@@ -71,14 +78,16 @@ def biwrite(k,v,is_rollback=False):
             bi[TRANLEVEL][k]=None 
 
     debugprint('bi queue==>',bi)
-    
+ 
+# remove index
 def idx_remove(k,v):
     if not k in idx: return
     idx[k].remove(v)
+    # if index not associated with any values, remove entry
     if len(idx[k]) == 0:
         idx.pop(k)
 
-    
+# create/update a database key/value pair
 def dbset(k,v,is_rollback=False):
     # send transaction biwriter
     # TODO: can biwrite be made into a decorator?
@@ -91,17 +100,18 @@ def dbset(k,v,is_rollback=False):
     # create / update
     db[k] = v
     
-    # create new or update existing index based on current value        
+    # create index based on current value if new     
     if v not in idx:
         idx[v] = set()
-        
+    
+    # include current key in index
     idx[v] = idx[v].union((k,))
    
-
+# retrieve value for given key
 def dbget(k):
     return db[k] if k in db else 'NULL'
 
-
+# remove key/value pair from database and index
 def dbunset(k,is_rollback=False):
     if k in db:
         # send to bi writer; TODO: make into decorator?
@@ -111,17 +121,24 @@ def dbunset(k,is_rollback=False):
         # remove entry from database    
         db.pop(k)
 
+# return number of index set elements
 def numequalto(k):
     return len(idx[k]) if k in idx else 0
 
+# dump db, idx, and bi values 
 def show():
     return 'db{}==>',db, 'idx{}==>', idx, 'bi{}==>',bi
 
+# reset all database, index and before-image handling vars to initial state
 def reset():
     global db, idx, bi, TRANLEVEL
     # reset all database, index, before-image and transaction level collection-globals
-    db, idx, bi, TRANLEVEL = {},{},{},0
-    
+    db.clear()
+    idx.clear()
+    bi.clear() 
+    TRANLEVEL = 0
+
+# dump some help text
 def help():
     print ('SET <key> <value> :: set a key/value pair')
     print ('UNSET <key> :: remove a key/value pair')
@@ -135,6 +152,7 @@ def help():
     print ('HELP :: show these commands')
     print ('DEBUG :: toggle debugging statements on/off')
     
+# execute commands from interpreter    
 def cmd_exec(cmd):
     # assign functions to all available commands
     cmdlist = {'set':dbset, 'unset':dbunset, 'get':dbget, 'numequalto':numequalto, 
@@ -150,13 +168,14 @@ def cmd_exec(cmd):
         return
     
     # execute function defined in cmdlist referenced by cmd[0]
-    # provide remaining command line elements as positional parameters
+    # provide remaining command line elements, cmd[1:] as positional arguments
     try:
         result = cmdlist[cmd[0]](*cmd[1:])
         if cmd[0] in printresult and result != None: print (result)
     except:
         print ('cmd_exec failed for:', cmd[0], cmd[1:])
-      
+
+# command line interpreter
 if __name__ == '__main__':
     while True: 
         try:
