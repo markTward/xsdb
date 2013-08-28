@@ -1,4 +1,3 @@
-#!/usr/local/bin/python
 '''
 dbxs.py
 Created on Aug 26, 2013
@@ -8,28 +7,38 @@ challenge to create an xtra small DB with set,get,unset and transaction scoping 
 
 '''
 
+from __future__ import print_function
 import sys, shlex
+
 
 db = {}
 idx = {}
 bi = {}
 
 TRANLEVEL=0
-DEBUG=0
+DEBUG=False
+
+def debug():
+    global DEBUG
+    DEBUG = not DEBUG
+
+def debugprint(*args):
+    if DEBUG:
+        print (args)
     
 def begin():
     global TRANLEVEL
     TRANLEVEL += 1
     if TRANLEVEL not in bi:
         bi[TRANLEVEL] = {}
-    if DEBUG > 0: print 'BEGIN TRANLEVEL==>', TRANLEVEL, bi
+    debugprint('BEGIN TRANLEVEL==>', TRANLEVEL, bi)
     
 def rollback():
     global TRANLEVEL    
     if TRANLEVEL >= 1:
-        if DEBUG > 0: print 'ROLLBACK TRANLEVEL==>', TRANLEVEL, bi[TRANLEVEL]
+        debugprint('ROLLBACK TRANLEVEL==>', TRANLEVEL, bi[TRANLEVEL])
         for db_key ,rollback_value in bi[TRANLEVEL].items():
-            if DEBUG > 0: print '  BACKOUT transaction to', db_key ,rollback_value
+            debugprint('  BACKOUT transaction to', db_key ,rollback_value)
             # rollback by executing previous state's set and unset commands
             # is_rollback=True blocks rewrite to bi file blocked
             if rollback_value != None:
@@ -44,7 +53,6 @@ def rollback():
 
 def commit():
     global TRANLEVEL
-    
     if TRANLEVEL > 0:
         bi.clear()
         TRANLEVEL = 0
@@ -62,14 +70,15 @@ def biwrite(k,v,is_rollback=False):
         else:
             bi[TRANLEVEL][k]=None 
 
-    if DEBUG > 0: print 'bi queue==>',bi
+    debugprint('bi queue==>',bi)
     
 def idx_remove(k,v):
     if not k in idx: return
     idx[k].remove(v)
     if len(idx[k]) == 0:
         idx.pop(k)
-      
+
+    
 def dbset(k,v,is_rollback=False):
     # send transaction biwriter
     # TODO: can biwrite be made into a decorator?
@@ -88,8 +97,10 @@ def dbset(k,v,is_rollback=False):
         
     idx[v] = idx[v].union((k,))
    
+
 def dbget(k):
     return db[k] if k in db else 'NULL'
+
 
 def dbunset(k,is_rollback=False):
     if k in db:
@@ -111,38 +122,41 @@ def reset():
     # reset all database, index, before-image and transaction level collection-globals
     db, idx, bi, TRANLEVEL = {},{},{},0
     
+def help():
+    print ('SET <key> <value> :: set a key/value pair')
+    print ('UNSET <key> :: remove a key/value pair')
+    print ('GET <key> :: retrieve value for given key')
+    print ('NUMEQUALTO <value> :: total number of keys set to value')
+    print ('BEGIN :: start a transaction level')
+    print ('ROLLBACK :: backout all transactions for current block')
+    print ('COMMIT :: commit all transactions across all block')
+    print ('SHOW :: dump all database, index and transaction level values')
+    print ('RESET :: delete all key/value pairs and clear all transaction blocks')
+    print ('HELP :: show these commands')
+    print ('DEBUG :: toggle debugging statements on/off')
+    
 def cmd_exec(cmd):
     # assign functions to all available commands
     cmdlist = {'set':dbset, 'unset':dbunset, 'get':dbget, 'numequalto':numequalto, 
                'begin':begin,'rollback':rollback,'commit':commit, 
-               'show':show, 'reset':reset}
+               'show':show, 'reset':reset, 'debug':debug, 'help':help}
     # commands producing output
     printresult = ['get','numequalto','show', 'commit', 'rollback']
     
     try:
         assert cmd[0] in cmdlist    
     except:
-        print "cmd_exec() ERROR: unknown command",cmd[0]
+        print ("cmd_exec() ERROR: unknown command",cmd[0])
         return
-        
-    icmd = cmd[0]
-    params = {}
     
-    # this only works on narrow spec, would need to push into command/argument validation
-    # TODO: better param handling
-    if len(cmd) == 3:
-        params = {'k':cmd[1],'v':cmd[2]}
-    elif len(cmd) == 2:
-        params = {'k':cmd[1]}
-    
-    # execute function defined in cmdlist with parameter keyword blob
+    # execute function defined in cmdlist referenced by cmd[0]
+    # provide remaining command line elements as positional parameters
     try:
-        result = cmdlist[icmd](**params)
-        # TODO: figure out best practice for handling function return when no return defined
-        if icmd in printresult and result != None: print result
+        result = cmdlist[cmd[0]](*cmd[1:])
+        if cmd[0] in printresult and result != None: print (result)
     except:
-        print 'cmd_exec failed for:', icmd, params
-     
+        print ('cmd_exec failed for:', cmd[0], cmd[1:])
+      
 if __name__ == '__main__':
     while True: 
         try:
