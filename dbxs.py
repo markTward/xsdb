@@ -4,7 +4,10 @@ Created on Aug 26, 2013
 @author: mward
 
 challenge to create an xtra small in-memory DB
-
+database (db) write is 'optimistic' and always current
+index (idx) inverts db key/value pair, storing db key in python set() for each value
+before-image (bi) file saves current key/value pair when transaction invoked
+fun!
 '''
 
 from __future__ import print_function
