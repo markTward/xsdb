@@ -15,13 +15,13 @@ from __future__ import print_function
 import sys, shlex
 
 # global values to support database key/value pair storage, indexing and before-imaging if a transaction is invoked
-db = {}
-idx = {}
-bi = {}
-TRANLEVEL=0
-
-# global value for viewing/hiding debuggin statements
-DEBUG=False
+def init():
+    global db, idx, bi, TRANLEVEL, DEBUG
+    db = {}
+    idx = {}
+    bi = {}
+    TRANLEVEL=0
+    DEBUG=False
 
 # toggle DEBUG setting
 def debug():
@@ -105,7 +105,8 @@ def dbset(k,v,is_rollback=False):
         >>> db['a']
         '10'
         >>> idx['10']
-        set(['aa'])
+        set(['a'])
+        >>> reset()
     '''
     
     biwrite(k,v,is_rollback)
@@ -135,8 +136,9 @@ def dbget(k):
         >>> db['b']=-99
         >>> dbget('b')
         -99
-        >>> dbget('a')
+        >>> dbget('abc')
         'NULL'
+        >>> reset()
     '''
     return db[k] if k in db else 'NULL'
 
@@ -206,8 +208,13 @@ def cmd_exec(cmd):
 
 # command line interpreter
 if __name__ == '__main__':
+    # initialize module global values
+    init()
+    
+    # run doctest prior to executing CLI
     import doctest
     doctest.testmod()
+    
     while True: 
         try:
             cmd_input = sys.stdin.readline().strip()
