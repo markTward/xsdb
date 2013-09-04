@@ -13,7 +13,6 @@ fun!
 
 from __future__ import print_function
 import sys, shlex
-import shelve
 
 # global values to support database key/value pair storage, indexing and before-imaging if a transaction is invoked
 db = {}
@@ -28,6 +27,7 @@ DEBUG=False
 def debug():
     global DEBUG
     DEBUG = not DEBUG
+    print ('DEBUG==>', DEBUG)
 
 # simple dump of debugging text
 def debugprint(*args):
@@ -93,8 +93,21 @@ def idx_remove(k,v):
 
 # create/update a database key/value pair
 def dbset(k,v,is_rollback=False):
-    # send transaction biwriter
-    # TODO: can biwrite be made into a decorator?
+    ''' 
+    Input:
+        k as key
+        v as value
+        is_rollback identifies whether dbset() is called from rollback() and to block biwrite() if so
+    Output:
+        No output
+    Examples:
+        >>> dbset('a','10')
+        >>> db['a']
+        '10'
+        >>> idx['10']
+        set(['aa'])
+    '''
+    
     biwrite(k,v,is_rollback)
         
     # if update and not create, remove previous index entry corresponding to previous value
@@ -113,6 +126,18 @@ def dbset(k,v,is_rollback=False):
    
 # retrieve value for given key
 def dbget(k):
+    '''
+    Input:
+        k as key
+    Output:
+        value for key held in db dictionary; NULL if doesn't exist
+    Example:
+        >>> db['b']=-99
+        >>> dbget('b')
+        -99
+        >>> dbget('a')
+        'NULL'
+    '''
     return db[k] if k in db else 'NULL'
 
 # remove key/value pair from database and index
@@ -181,6 +206,8 @@ def cmd_exec(cmd):
 
 # command line interpreter
 if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
     while True: 
         try:
             cmd_input = sys.stdin.readline().strip()
